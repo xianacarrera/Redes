@@ -3,12 +3,12 @@
 #include<inttypes.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
-#include<netdb.h>     // Macro NI_MAXHOST, NI_MAXSERV
-#include<unistd.h>    //getopt
-#include<ctype.h>     // isprint
-#include<string.h>    // memset
-#include<limits.h>    // ULONG_MAX
-#include<errno.h>     // Overflow
+#include<unistd.h>    // Función getopt()
+#include<netdb.h>     // Macros NI_MAXHOST y NI_MAXSERV
+#include<ctype.h>     // Función isprint()
+#include<string.h>    // Función memset()
+#include<limits.h>    // Macro ULONG_MAX
+#include<errno.h>     // Gestión de errores
 
 /*
  * Dudas:
@@ -24,12 +24,25 @@
   9) Cambiar a 4 funciones --> PREGUNTAR
  */
 
+
+/*
+ * Función que a partir del nombre de un host, determina su nombre canónico
+ * y todas las IPs que tiene asociado, sean IPv4 o IPv6.
+ *
+ * La función no devuelve nada. En caso de error, imprime un mensaje con una
+ * descripción del mismo. Si la ejecución transcurre sin fallos, imprime los
+ * resultados que ha obtenido.
+ *
+ * Parámetros:
+ * const char * name -> (Entrada) cadena con el nombre del host a localizar.
+ *
+ */
 void name_a_hostinfo(const char * name){
     struct addrinfo *res;     // Lista enlazada que guardará el resultado
     struct addrinfo *rp;      // Puntero para avanzar por el resultado
     struct addrinfo hints;    // Configuración de opciones de getaddrinfo
-    struct sockaddr_in * socka_v4;   // Encapsula socket para direcciones IPv4
-    struct sockaddr_in6 * socka_v6;  // Encapsula socket para direcciones IPv6
+    struct sockaddr_in * socka_v4;   // Representa socket con dirección IPv4
+    struct sockaddr_in6 * socka_v6;  // Representa socket con dirección IPv6
     struct in_addr * ip_v4;       // Encapsula una dirección IPv4 en binario
     struct in6_addr * ip_v6;      // Encapsula una dirección IPv6 en binario
     char * iptext;                // Direcciones IP en formato textual
@@ -58,7 +71,8 @@ void name_a_hostinfo(const char * name){
 
     if (error){
         // gai_strerror describe el error en función del código recibido
-        fprintf(stderr, "Error en getaddrinfo: %s\n", gai_strerror(error));
+        fprintf(stderr, "Error de getaddrinfo en name_a_hostinfo: %s\n",
+                gai_strerror(error));
         return;
     }
 
@@ -75,7 +89,8 @@ void name_a_hostinfo(const char * name){
             // La longitud máxima será INET_ADDRSTRLEN al ser una IP_v4
             if ((iptext = (char *) malloc(INET_ADDRSTRLEN*sizeof(char)))
                     == NULL){
-                fprintf(stderr, "Error reservando memoria\n");
+                fprintf(stderr, "Error reservando memoria en "
+                        "name_a_hostinfo\n");
                 break;
             }
 
@@ -87,13 +102,14 @@ void name_a_hostinfo(const char * name){
             // La longitud máxima será INET6_ADDRSTRLEN al ser una IP_v6
             if ((iptext = (char *) malloc(INET6_ADDRSTRLEN*sizeof(char)))
                     == NULL){
-                fprintf(stderr, "Error reservando memoria\n");
+                fprintf(stderr, "Error reservando memoria en "
+                        "name_a_hostinfo\n");
                 break;
             }
 
         } else {      // No se debería dar nunca
             fprintf(stderr, "Se ha obtenido un tipo de resultado desconocido "
-                    "con getaddrinfo\n");
+                    "con getaddrinfo en name_a_hostinfo\n");
             // Dado que desconocemos si el resto de resultados son correctos,
             // cortamos la ejecución
             break;
@@ -115,8 +131,9 @@ void name_a_hostinfo(const char * name){
                 iptext,
                 rp->ai_family == AF_INET? INET_ADDRSTRLEN : INET6_ADDRSTRLEN
         )) == NULL){
+            // inet_ntop actualiza errno de acuerdo al error ocurrido
             fprintf(stderr, "Error en la conversión de binario a textual con "
-                    "inet_ntop\n");
+                    "inet_ntop en name_a_hostinfo: %s\n", strerror(errno));
             break;      // Cortamos la ejecución
         }
 
@@ -136,6 +153,23 @@ void name_a_hostinfo(const char * name){
     if (iptext != NULL) free(iptext);
 }
 
+
+/*
+ * Función que a partir del nombre de un servicio, determina cuál es su número
+ * de puerto asociado.
+ *
+ * La función no devuelve nada. En caso de error, imprime un mensaje con una
+ * descripción del mismo. Si la ejecución transcurre sin fallos, imprime sus
+ * resultados, esto es, el número de puerto asociado al servicio.
+ *
+ * Parámetros:
+ * const char * service -> (entrada) cadena con el nombre del servicio a
+ * traducir. (La salida de la función también es correcta si se pasa el número
+ * de puerto del servicio en lugar de su nombre. Pero, en tal caso, el
+ * resultado es el propio número introducido como entrada, por lo que no
+ * resulta útil).
+ *
+ */
 void service_a_port(const char * service){
     struct addrinfo *res;          // Guardará el resultado de getaddrinfo
     struct addrinfo hints;         // Configuración de opciones de getaddrinfo
@@ -147,10 +181,16 @@ void service_a_port(const char * service){
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;  // Nos es indiferente seleccionar IPv4 o IPv6
-
-    // Los campos ai_socktype, ai_protocol y ai_flags se mantienen a 0,
-    // indicando que se acepta cualquier tipo de socket, cualquier protocolo,
-    // y sin seleccionar opciones adicionales, respectivamente.
+    /*
+     * ai_family se indica por coherencia, pero en realidad, al dejar el
+     * nombre del host a NULL en getaddrinfo, la dirección del resultado
+     * será la del propio sistema (loopback): INADDR_LOOPBACK para IPv4
+     * o IN6ADDR_LOOPBACK_INIT para IPv6
+     *
+     * Los campos ai_socktype, ai_protocol y ai_flags se mantienen a 0,
+     * indicando que se acepta cualquier tipo de socket, cualquier protocolo,
+     * y sin seleccionar opciones adicionales, respectivamente.
+     */
 
     /*
      * Llamamos a getaddrinfo:
@@ -163,18 +203,20 @@ void service_a_port(const char * service){
 
     if (error){
         // gai_strerror describe el error en función del código recibido
-        fprintf(stderr, "Error en getaddrinfo: %s\n", gai_strerror(error));
+        fprintf(stderr, "Error de getaddrinfo en service_a_port: %s\n",
+                gai_strerror(error));
         return;
     }
 
     // El resultado contendrá una única estructura addrinfo
     if (res->ai_family == AF_INET){
+        printf("%s\n", res->);
         port_or = ((struct sockaddr_in *) res->ai_addr)->sin_port;
     } else if (res->ai_family == AF_INET6){
         port_or = ((struct sockaddr_in6 *) res->ai_addr)->sin6_port;
     } else {
-        fprintf(stderr, "Se ha obtenido un tipo de resultado desconocido en "
-                "getaddrinfo\n");
+        fprintf(stderr, "Se ha obtenido un tipo de resultado desconocido con "
+                "getaddrinfo en service_a_port\n");
         return;
     }
 
@@ -192,15 +234,28 @@ void service_a_port(const char * service){
      freeaddrinfo(res);
 }
 
-/* Devuelve:
- * 2 -> Dirección IPv4 correcta
- * 1 -> Dirección IPv6 correcta
- * 0 -> Error
 
- // Comprobamos que el input sea una dirección válida
- // Al mismo tiempo, determinamos si es una dirección IPv4 o IPv6
+/*
+ * Función auxiliar que comprueba si una determinada cadena presenta un
+ * formato de dirección IP válido.
+ * En caso afirmativo, la encapsula en una estructura in_addr o in6_addr,
+ * según sea IPv4 o IPv6, respectivamente.
+ * En caso contrario, describe el error que ha tenido lugar.
+ *
+ * Parámetros:
+ * const char * ip -> (Entrada) cadena con la dirección a verificar
+ * struct in_addr * ipv4bin -> (Salida) estructura donde se guardará la IP
+ *         encapsulada, en caso de que se trate de una IPv4
+ * struct in6_addr * ipv6bin -> (Salida) estructura donde se guardará la IP
+ *         encapsulada, en caso de que se trate de una IPv6
+ *
+ * La función devuelve:
+ *      2 -> Si ip es una dirección IPv4 correcta
+ *      1 -> Si ip es una dirección IPv6 correcta
+ *      0 -> En caso de error
+ *
  */
-short check_IP(const char * ip, struct in_addr * ipv4bin,
+short comprobar_IP(const char * ip, struct in_addr * ipv4bin,
         struct in6_addr * ipv6bin){
 
     // Intentamos convertir la IP a formato binario suponiendo que es IPv4
@@ -219,33 +274,55 @@ short check_IP(const char * ip, struct in_addr * ipv4bin,
             break;
         case -1:
             fprintf(stderr, "La familia de direcciones pasada como argumento "
-                    "(AF) es incorrecta\n");
+                    "(AF) a inet_pton en comprobar_IP es incorrecta\n");
             break;
         default:
-            fprintf(stderr, "Error desconocido en inet_pton\n");
+            fprintf(stderr, "Error desconocido de inet_pton en "
+                    "comprobar_IP\n");
     }
 
     return 0;     // Resultado de error
 }
 
+
+/*
+ * Función auxiliar que prepara una estructura representativa de un socket
+ * para una dirección IP. Según tenga formato IPv4 o IPv6, se guardará en un
+ * sockaddr_in o un sockaddr_in6, pero el resultado se devuelve de forma
+ * genérica como un sockaddr a través de un parámetro.
+ *
+ * La función también comprueba que la ip sea correcta llamando a comprobar_IP.
+ *
+ * En caso de error, se imprime un mensaje descriptivo.
+ *
+ * Parámetros:
+ * const char * ip -> (Entrada) cadena con la dirección a encapsular.
+ * struct sockaddr **addr -> (Salida) puntero a puntero de una estructura
+ *         sockaddr que será apuntado a la representación adecuada del socket.
+ *
+ * La función devuelve:
+ *      1 -> Ejecución correcta
+ *      0 -> En caso de error
+ *
+ */
 short setup_socket(const char * ip, struct sockaddr **addr){
     struct in_addr ipv4bin;         // Encapsula una dirección IPv4 binaria
     struct in6_addr ipv6bin;        // Encapsula una dirección IPv6 binaria
-    struct sockaddr_in * addr_v4;   // Encapsulará la dirección IPv4
-    struct sockaddr_in6 * addr_v6;  // Encapsulará la dirección IPv6
+    struct sockaddr_in * addr_v4;   // Representa socket con dirección IPv4
+    struct sockaddr_in6 * addr_v6;  // Representa socket con dirección IPv6
 
     /*
-     * Llamamos a check_IP para comprobar si la IP es válida.
+     * Llamamos a comprobar_IP para comprobar si la IP es válida.
      * Si es así, nos la guarda en formato binario en ipv4bin o ipv6bin,
      * según corresponda.
      */
-    switch (check_IP(ip, &ipv4bin, &ipv6bin)) {
+    switch (comprobar_IP(ip, &ipv4bin, &ipv6bin)) {
         case 2:        // Dirección IPv4 válida
             // Reservamos memoria para el sockaddr_in
             if ((addr_v4 = (struct sockaddr_in *)
                         malloc(sizeof(struct sockaddr_in))
                 ) == NULL){
-                fprintf(stderr, "Error reservando memoria\n");
+                fprintf(stderr, "Error reservando memoria en setup_socket\n");
                 return 0;    // Error
             }
 
@@ -261,7 +338,7 @@ short setup_socket(const char * ip, struct sockaddr **addr){
             if ((addr_v6 = (struct sockaddr_in6 *)
                     malloc(sizeof(struct sockaddr_in6))
                 ) == NULL){
-                fprintf(stderr, "Error reservando memoria\n");
+                fprintf(stderr, "Error reservando memoria en setup_socket\n");
                 return 0;     // Error
             }
 
@@ -275,31 +352,47 @@ short setup_socket(const char * ip, struct sockaddr **addr){
             return 1;      // Éxito
 
         case 0:
-            // Hubo un error en check_IP (la propia función lo imprime)
+            // Hubo un error en comprobar_IP (la propia función lo imprime)
             return 0;
         default:        // Nunca debería darse
-            fprintf(stderr, "Error no documentado al comprobar la IP\n");
+            fprintf(stderr, "Error no documentado en comprobar_IP. "
+                    "Recibido en setup_socket\n");
     }
     return 0;
 }
 
+
+/*
+ * Función que a partir de una dirección IP determina el nombre de su host
+ * asociado. Se aceptan tanto direcciones IPv4 como IPv6.
+ *
+ * La función no devuelve nada. En caso de error, imprime un mensaje con una
+ * descripción del mismo. Si la ejecución transcurre sin fallos, imprime sus
+ * resultados, esto es, el nombre del host correspondiente a la IP.
+ *
+ * Parámetros:
+ * const char * ip -> (entrada) cadena con el nombre de la IP a buscar.
+ *
+ */
 void address_a_hostname(const char * ip){
-    struct sockaddr * addr;
-    char hostname[NI_MAXHOST]; // NI_MAXHOST es (longitud máxima de un nombre)
-    short error;
+    struct sockaddr * addr;    // Representa un socket
+    char hostname[NI_MAXHOST]; // Cadena que guardará el nombre del host
+        // NI_MAXHOST indica la longitud máxima que puede tener un nombre
+    short error;               // Gestión de errores
 
     printf("*********************************************************"
             "*******\n");
 
     /*
      * Llamamos a setup_socket para comprobar que el input tenga el formato
-     * correcto y, a la vez, preparar la estructura de la dirección a convertir
+     * correcto y, a la vez, preparar la estructura del socket, encapsulando
+     * la dirección a convertir.
      */
-    if (!setup_socket(ip, &addr)) return;
+    if (!setup_socket(ip, &addr)) return;   // Si devuelve 0, hubo un error
 
     /*
      * Llamamos a getnameinfo con los siguientes argumentos:
-     *      1) addr, la dirección a convertir
+     *      1) addr, que contiene la dirección a convertir
      *      2) el tamaño de la estructura addr (como socklen_t, un entero de
      *         al menos 32 bits)
      *      3) la cadena donde se guardará el nombre del host
@@ -315,22 +408,42 @@ void address_a_hostname(const char * ip){
 
     if (error){    // La función devuelve un valor distinto de 0
         // Mostramos el significado del código de error con gai_strerror()
-        fprintf(stderr, "Error en getnameinfo: %s\n",
+        fprintf(stderr, "Error de getnameinfo en address_a_hostname: %s\n",
                 gai_strerror(error_getnameinfo));
         return;
     }
 
+    // Si no hubo errores, imprimimos el resultado
     printf("Dirección IPv%d %s: %s\n", addr->sa_family == AF_INET? 4 : 6,
             ip, hostname);
     // Sabemos que el campo sa_family de addr es AF_INET o AF_INET6 porque
-    // la función getnameinfo no lo modifica (es const)
+    // la función getnameinfo mantiene constante lo contruido en setup_socket
 
     // Liberamos la memoria que se reservó para addr en setup_socket
     free(addr);
 }
 
-// Devuelve 0 si error, 1 si bien
-short es_formato_port_valido(const char * port, uint16_t * port_formateado){
+
+/*
+ * Función que comprueba si una determinada cadena de caracteres tiene un
+ * formato de puerto válido, esto es, que es un entero en el rango
+ * [0, 65535].
+ *
+ * Si en efecto, se trata de un puerto correcto, la función devuelve 1 y
+ * guarda en port_formateado el entero correspondiente.
+ * En caso contrario, se imprime una descripción del problema y se devuelve 0.
+ *
+ * Parámetros:
+ * const char * port -> (entrada) cadena con el puerto a convertir
+ * uint16_t * port_formateado -> (salida) dirección del uint16_t donde se
+ *      guardará el puerto en formato entero. uint16_t es un entero sin signo
+ *      de 16 bits, el tipo definido para puertos (cabecera inttypes.h).
+ *
+ * La función devuelve:
+ *      0 -> En caso de error
+ *      1 -> Si la conversión se realizó correctamente
+ */
+short comprobar_port(const char * port, uint16_t * port_formateado){
     // Para comprobar si el puerto es válido, usaremos strtoul en lugar de
     // atoi, que no permitiría distinguir el puerto 0 de un error.
 
@@ -346,7 +459,6 @@ short es_formato_port_valido(const char * port, uint16_t * port_formateado){
      *      3) la base del número, en este caso, decimal
      * Nos devolverá un unsigned long
      */
-
     port_numerico = strtoul(port, &final_conversion, 10);
 
     // Si la cadena es no vacía y toda ella es numérica, final_conversion debe
@@ -370,38 +482,67 @@ short es_formato_port_valido(const char * port, uint16_t * port_formateado){
         return 0;
     }
 
+    // El input del usuario es correcto
     *port_formateado = (uint16_t) port_numerico;
     return 1;
 }
 
+
+/*
+ * Función que obtiene el nombre de servicio asociado a un determinado puerto.
+ * No devuelve nada. En caso de error, imprime un mensaje descriptivo.
+ * Si la ejecución transcurre sin problemas, imprime el resultado obtenido.
+ *
+ * Parámetros:
+ * const char * port -> (entrada) Cadena con el puerto asociado al servicio.
+ *
+ */
 void port_a_service(const char * port){
-    uint16_t port_num;
-    int error;
-    struct sockaddr_in addr;
-    char service[NI_MAXSERV];  //NI_MAXSERV se define como la longitud máxima de la cadena de texto que representa un servicio
+    struct sockaddr_in addr;   // Guardará el puerto. Entrada de getnameinfo
+    uint16_t port_num;         // Puerto en formato entero
+    char service[NI_MAXSERV];  // Cadena que guardará el nombre del servicio
+        // NI_MAXSERV es la longitud máxima de un nombre de servicio
+    int error;                 // Gestión de errores de getnameinfo
 
     printf("*********************************************************"
             "*******\n");
 
     // Comprobamos que el input sea numérico y esté dentro del rango límite
-    if (!es_formato_port_valido(port, &port_num)) return;
+    // En caso afirmativo, se guardará el entero correspondiente en port_num
+    if (!comprobar_port(port, &port_num)) return;
 
-    // Construimos el socket
-    // No podemos utilizar la estructura abstracta directamente
-    // Construimos el socket con IPv4 ¿¿¿DA IGUAl??
-    // Hace falta sin_family??
+    /*
+     * Indicamos la información necesaria en la estructura de socket
+     * No podemos utilizar la estructura abstracta directamente, de modo que
+     * tomamos un sockaddr_in (IPv4). Un sockaddr_in6 también sería válido.
+     * Debemos pasar el puerto de orden de host a orden de red con htons.
+     */
     addr.sin_port = htons(port_num);
-    addr.sin_family = AF_INET;
+    addr.sin_family = AF_INET;          // IPv4
 
-    // Casteamos el socket a la estructura abstracta sockaddr
+    /*
+     * Llamamos a getnameinfo con argumentos:
+     *      1) addr casteado a un puntero a la estructura abstracta sockaddr
+     *      2) el tamaño de la estructura addr (como socklen_t, un entero de
+     *         al menos 32 bits)
+     *      3) NULL, ya que no vamos a recibir el nombre de ningún host
+     *      4) 0, puesto que el anterior argumento es nulo
+     *      5) la cadena en la que guardaremos el nombre del servicio
+     *      6) la longitud máxima que puede tener esa cadena
+     *      7) no necesitamos flags, por lo que dejamos el argumento a 0
+     */
     error = getnameinfo((const struct sockaddr *) &addr,
-            (socklen_t) sizeof(addr), NULL, 0, service, NI_MAXSERV, 0);
+            (socklen_t) sizeof(addr), NULL, 0,
+            service, (socklen_t) NI_MAXSERV, 0);
 
     if (error){
-        fprintf(stderr, "Error en la función getnameinfo de port a service\n");
-        exit(EXIT_FAILURE);
+        // gai_strerror describe el error en función del código recibido
+        fprintf(stderr, "Error de getaddrinfo en port_a_service: %s\n",
+                gai_strerror(error));
+        return;
     }
 
+    // Como no hay error, imprimimos el resultado obtenido
     printf("Puerto: %s: servicio %s\n", port, service);
 }
 
