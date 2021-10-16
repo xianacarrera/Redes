@@ -21,6 +21,7 @@
  * de servicio/dirección IP/número de puerto introducido por el usuario.
  */
 
+
 // Funciones principales
 void name_a_hostinfo(const char * name);
 void service_a_port(const char * service);
@@ -41,7 +42,7 @@ int main(int argc, char * argv[]) {
     int opt;
     // name: Nombre del host
     // service: Nombre del servicio
-    // addr: Direccion IPv4 o IPv6
+    // addr: Dirección IPv4 o IPv6
     // port: Puerto
     char * name = NULL, * service = NULL, * addr = NULL, * port = NULL;
 
@@ -50,7 +51,7 @@ int main(int argc, char * argv[]) {
     if (argc < 2) {
         printf("Falta un operando\n");
         printf("Usar: %s [-n Nombre del host] [-s Nombre del servicio "
-                "(p.e. http)] [-i Direccion ip] [-p Numero de puerto]\n",
+                "(p.e. http)] [-i Direccion IP] [-p Numero de puerto]\n\n",
                 argv[0]);
         return (EXIT_FAILURE);
     }
@@ -62,29 +63,50 @@ int main(int argc, char * argv[]) {
     while ((opt = getopt(argc, argv, ":n:s:i:p:")) != -1) {
         switch (opt) {
             case 'n':
+                if (name != NULL){     // Ya se ha registrado un nombre de host
+                    printf("No se permiten argumentos repetidos. Se utilizará "
+                            "el primer nombre de host introducido.\n");
+                    break;
+                }
                 name = optarg;     // Argumento nombre de host
                 break;
             case 's':
+                if (service != NULL){  // Ya hay registrado un servicio
+                    printf("No se permiten argumentos repetidos. Se utilizará "
+                            "el primer servicio introducido.\n");
+                    break;
+                }
                 service = optarg;  // Argumento nombre de servicio
                 break;
             case 'i':
+                if (addr != NULL){    // Ya hay registrada una dirección IP
+                    printf("No se permiten argumentos repetidos. Se utilizará "
+                            "la primera dirección IP introducida.\n");
+                    break;
+                }
                 addr = optarg;    // Argumento direccion ip
                 break;
             case 'p':
+                if (port != NULL){    // Ya hay registrado un puerto
+                    printf("No se permiten argumentos repetidos. Se utilizará "
+                            "el primer puerto introducido.\n");
+                    break;
+                }
                 port = optarg;    // Argumento numero de puerto
                 break;
             case ':':    // Se intrudujo un flag sin argumento obligatorio
-                fprintf(stderr, "La opción -%c requiere un argumento.\n",
+                fprintf(stderr, "La opción -%c requiere un argumento.\n\n",
                         optopt);
                 return (EXIT_FAILURE);    // Cortamos la ejecución
             case '?':
                 if (isprint(optopt))  // Se introdujo un flag no permitido
-                    fprintf(stderr, "Opción desconocida `-%c'.\n", optopt);
+                    fprintf(stderr, "Opción desconocida `-%c'.\n\n", optopt);
                 else      // Hay un carácter no legible en las opciones
                     fprintf(stderr, "Caracter de opción desconocido"
-                            " `\\x%x'.\n", optopt);
+                            " `\\x%x'.\n\n", optopt);
                 return (EXIT_FAILURE);   // Cortamos la ejecución
-            default: // Se produjo un error indeterminado. Nunca se deberia llegar aqui.
+            default:
+                // Error indeterminado. Nunca se debería llegar aqui.
                 abort();    // Finalización anormal del programa
             }
     }
@@ -301,7 +323,7 @@ void service_a_port(const char * service){
 
     if (error){
         // gai_strerror describe el error en función del código recibido
-        fprintf(stderr, "Error de getaddrinfo en service_a_port: %s\n",
+        fprintf(stderr, "Error de getaddrinfo en service_a_port: %s\n\n",
                 gai_strerror(error));
         exit(EXIT_FAILURE);
     }
@@ -415,8 +437,11 @@ void port_a_service(const char * port){
     printf("*********************************************************"
             "*******\n");
 
-    // Comprobamos que el input sea numérico y esté dentro del rango límite
-    // En caso afirmativo, se guardará el entero correspondiente en port_num
+    /*
+     * Comprobamos que el puerto sea numérico y esté dentro del rango límite.
+     * comprobar_port devuelve 0 en caso de error.
+     * Si no hay error, se guardará en port_num el puerto formateado.
+     */
     if (!comprobar_port(port, &port_num)) exit(EXIT_FAILURE);
 
     /*
@@ -647,12 +672,17 @@ void address_port_a_hostname_service(const char * ip, const char * port){
     printf("*********************************************************"
             "*******\n");
 
-    // Comprobamos que el puerto sea numérico y esté dentro del rango límite
+    /*
+     * Comprobamos que el puerto sea numérico y esté dentro del rango límite.
+     * comprobar_port devuelve 0 en caso de error.
+     * Si no hay error, se guardará en port_num el puerto formateado.
+     */
     if (!comprobar_port(port, &port_num)) exit(EXIT_FAILURE);
 
     /*
      * Llamamos a setup_socket para comprobar que la dirección tenga un formato
-     * correcto y, a la vez, preparar la estructura de la dirección a convertir
+     * correcto y, a la vez, preparar la estructura de la dirección a
+     * convertir. Si hay algún error, devuelve 0.
      */
     if (!setup_socket(ip, &addr)) exit(EXIT_FAILURE);
 
