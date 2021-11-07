@@ -15,6 +15,7 @@
  * LÍMITE DEL PUERTO
  * Se puede usar inet_addr????
  * Podemos meter las funciones en una librería?
+
  */
 
 int main(int argc, char * argv[]){
@@ -26,7 +27,8 @@ int main(int argc, char * argv[]){
     char linea[N];
     char ipcli[INET_ADDRSTRLEN];
     int nbytes;
-    int leido;
+    //int leido;
+    int i;
 
     if (argc != 2)
         cerrar_con_error("Indicar un argumento: el puerto del servidor", 0);
@@ -36,12 +38,11 @@ int main(int argc, char * argv[]){
 
     /********************** CREACIÓN DEL SOCKET ***************************/
     sockserv = crear_socket();
-    /******************* ASIGNACIÓN DE DIRECCIÓN ***************************/
 
+    /******************* ASIGNACIÓN DE DIRECCIÓN ***************************/
     asignar_direccion_puerto(sockserv, puerto);
 
     /************************** ESCUCHA *******************************/
-
     // Ponemos el servidor a la escucha
     // Permitimos que pueda tener hasta 5 clientes a la cola
     marcar_pasivo(sockserv, 5);
@@ -73,28 +74,42 @@ int main(int argc, char * argv[]){
 
         /*************************** ENVÍO DE DATOS *************************/
 
-        nbytes = recibir(sockcon, linea);
+        while ((nbytes = recibir(sockcon, linea)) > 0){
 
-        // Como fgets puede leer '\0' sin problema, no paramos al encontrarnos
-        // uno, sino al procesar todos los bytes
+            // Como fgets puede leer '\0' sin problema, no paramos al encontrarnos
+            // uno, sino al procesar todos los bytes
 
 
-        printf("\nMensaje de %d bytes recibido:\n", nbytes);
-        leido = 0;
-        while (leido < nbytes){
-            printf("%c", linea[leido]);
-            linea[leido] = toupper(linea[leido]);
-            leido++;
+            printf("\nMensaje de %d bytes recibido:\n", nbytes);
+            /*
+            leido = 0;
+            while (leido < nbytes){
+                printf("%c", linea[leido]);
+                linea[leido] = toupper(linea[leido]);
+                leido++;
+            }*/
+            i = 0;
+            while (linea[i] != '\n'){
+                printf("%c", linea[i]);
+                linea[i] = toupper(linea[i]);
+                i++;
+            }
+
+
+            // Enviar N bytes???
+            // i + 1 por el carácter nulo?
+            nbytes = enviar_nbytes(sockcon, linea, i + 1);
+
+            printf("\nRealizado envío de %d byte%s.\n", nbytes,
+                nbytes > 1? "s" : "");
+            /*
+            printf("Longitud del mensaje original = %ld bytes\n",
+                    strlen(mensaje) + sizeof('\0'));
+            */
         }
 
-        // Enviar N bytes???
-        nbytes = enviar_nbytes(sockcon, linea, N);
+        printf("\n\n");
 
-        printf("Se han enviado %d bytes.\n", nbytes);
-        /*
-        printf("Longitud del mensaje original = %ld bytes\n",
-                strlen(mensaje) + sizeof('\0'));
-*/
         /************************** CIERRE DE LA CONEXIÓN *******************/
 
         cerrar_socket(sockcon);

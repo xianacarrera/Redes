@@ -10,7 +10,11 @@
 #include <ctype.h>
 #include "lib.h"
 
+// IP de Inés: 172.25.45.169
+
+
 // Comprobar fichero vacío
+// Qué pasa si hay caracteres nulos en medio del archivo
 
 int main(int argc, char * argv[]){
     FILE *fichero_ent;
@@ -21,10 +25,10 @@ int main(int argc, char * argv[]){
     struct sockaddr_in direccion;
     char buffer[N];
     char linea[N];
-    char * frase;
+    //char * frase;
     int res_recv;
     //int leido = 0;
-    int leido;
+    //int leido;
     int nbytes;
     int i;
 
@@ -66,29 +70,43 @@ int main(int argc, char * argv[]){
     // fgets lee a lo sumo 1 carácter menos que lo indicado como 2º argumento
     // Devuelve NULL si ha tenido lugar un error o ha llegado al final del fichero
     // Podemos distinguir entre esas situaciones usando ferror() o feof()
-    if (fgets(linea, N, fichero_ent) == NULL && ferror(fichero_ent))
-        cerrar_con_error("Ha tenido lugar un error en la lectura del "
-                "fichero", 0);
+    while (fgets(linea, N, fichero_ent) != NULL){
 
-    // Nótese que fgets puede leer '\0'. No para en ese punto.
+        sleep(1);
+        // Nótese que fgets puede leer '\0'. No para en ese punto.
 
-    // Enviar todos los bytes???
-    nbytes = enviar_nbytes(sockserv, linea, N);
+        // Enviar todos los bytes???
+        nbytes = enviar_nbytes(sockserv, linea, N);
 
-    printf("Se han enviado %d bytes.\n", nbytes);
-    /*
-    printf("Longitud del mensaje original = %ld bytes\n",
-            strlen(linea) + sizeof('\0'));
-*/
+        printf("Se han enviado %d bytes.\n", nbytes);
+        /*
+        printf("Longitud del mensaje original = %ld bytes\n",
+                strlen(linea) + sizeof('\0'));
+        */
 
-    res_recv = recibir(sockserv, &buffer[0]);
-    printf("Mensaje de %d bytes recibido:\n", res_recv);
-    leido = 0;
-    while (leido < res_recv){
-        frase = &buffer[leido];
-        printf("%s", frase);
-        leido += strlen(frase) + sizeof('\0');
+        res_recv = recibir(sockserv, &buffer[0]);
+        printf("Mensaje de %d bytes recibido:\n", res_recv);
+        /*
+        leido = 0;
+        while (leido < res_recv){
+            frase = &buffer[leido];
+            printf("%s", frase);
+            leido += strlen(frase) + sizeof('\0');
+        }*/
+        i = 0;
+        while (buffer[i] != '\n'){
+            printf("%c", buffer[i]);
+            i++;
+        }
+        printf("\n\n");
     }
+
+    // Comprobamos si fgets ha parado por un error o por llegar al final
+    if (ferror(fichero_ent))
+        // No terminamos el programa, porque probablemente podamos cerrar aún
+        // el socket sin error
+        fprintf(stderr, "Error - No se ha podido leer hasta el final del "
+                "fichero\n");
 
 
     cerrar_socket(sockserv);

@@ -9,59 +9,68 @@
 #include <string.h>
 #include "lib.h"
 
-/*
- * TODO:
- * perror
- * LÍMITE DEL PUERTO
- * Se puede usar inet_addr????
- * Podemos meter las funciones en una librería?
- */
+#DEFINE MAX_COLA 5     // Número máximo de clientes esperando ser atendidos
 
 int main(int argc, char * argv[]){
-    uint16_t puerto;
-    int sockserv;           // Socket de servidor
-    int sockcon;            // Socket de conexión
-    struct sockaddr_in ipportcli;
-    socklen_t length_ptr;
-    char mensaje[] = "Hey! Listen!\n";
-    char mensaje2[] = "¡Hola desde el otro lado!\n";
-    char ipcli[INET_ADDRSTRLEN];
-    int nbytes;
+    int sockserv;                    // Socket del servidor
+    int sockcon;                     // Socket de la conexión con el cliente
+    char mensaje1[] = "Hey! Listen!\n";    // Primer mensaje que se enviará
+    char mensaje2[] = "¡Hola desde el otro lado!\n";    // Segundo mensaje
+    uint16_t puerto;          // Puerto introducido pasado a formato entero
+    struct sockaddr_in ipportcli;    // Dirección del cliente (IP y puerto)
+    char ipcli[INET_ADDRSTRLEN];     // Cadena para almacenar la IP del
+                                     // cliente en formato de texto
+    int nbytes;                      // Número de bytes enviados al cliente
 
+
+    /************************ COMPROBACIÓN DEL INPUT ***********************/
+
+    // El usuario debe introducir el puerto desde el que el servidor
+    // escuchará las peticiones de los clientes
     if (argc != 2)
         cerrar_con_error("Indicar un argumento: el puerto del servidor", 0);
 
-    if (!comprobar_port(argv[1], &puerto))
-        exit(EXIT_FAILURE);
+    // Si el puerto no es válido, comprobar_port() finaliza el programa
+    // Si es válido, lo convierte a un uint16_t y guarda el resultado en puerto
+    comprobar_port(argv[1], &puerto);
 
-    /********************** CREACIÓN DEL SOCKET ***************************/
+
+    /************************* CREACIÓN DEL SOCKET *************************/
+
+    // Generamos un socket de dominio IPv4 y orientado a conexión (TCP)
+    // sockserv guardará el entero identificador del socket
     sockserv = crear_socket();
-    /******************* ASIGNACIÓN DE DIRECCIÓN ***************************/
 
+    /************************ ASIGNACIÓN DE DIRECCIÓN **********************/
+
+    /*
+     * Asignamos una dirección IP y un puerto al socket que acabamos de crear.
+     * Como IP elegimos INADDR_ANY (escuchará a través de cualquier interfaz).
+     * Como puerto elegimos el indicado por el usuario.
+     */
     asignar_direccion_puerto(sockserv, puerto);
 
-    /************************** ESCUCHA *******************************/
+    /******************************* ESCUCHA *******************************/
 
-    // Ponemos el servidor a la escucha
-    // Permitimos que pueda tener hasta 5 clientes a la cola
-    marcar_pasivo(sockserv, 5);
+    /*
+     * Ponemos el servidor a la escucha, esto es, lo marcamos como pasivo
+     * (podrá escuchar las solicitudes de conexión de clientes)
+     * Permitimos que pueda tener hasta 5 clientes esperando ser atendidos.
+     */
+    marcar_pasivo(sockserv, MAX_COLA);
 
+
+    /*********************** ATENCIÓN A LAS CONEXIONES *********************/
     while(1){
-
-        /********************* ATENCIÓN A LAS CONEXIONES ********************/
-        /*length_ptr = sizeof(struct sockaddr_in);
-        if ((sockcon = accept(
-                    sockserv, (struct sockaddr *) &ipportcli, &length_ptr
-                )) < 0){
-            perror("Error - no se pudo aceptar la conexión con accept()");
-            exit(EXIT_FAILURE);
-        }*/
         sockcon = atender(sockserv, &ipportcli, &length_ptr);
+
+        printf("length_ptr: %d\n", length_ptr);
+        printf("INET_ADDRSTRLEN: %d\n", INET_ADDRSTRLEN);
 
         // length_ptr como 4º argumento???
         if (inet_ntop(
                     AF_INET, (const void *) &ipportcli.sin_addr.s_addr,
-                    &ipcli[0], (socklen_t) length_ptr
+                    &ipcli[0], (socklen_t) INET_ADDRSTRLEN
                 ) == NULL)
             cerrar_con_error("Error al convertir la IP binaria del cliente "
                     "a texto", 1);

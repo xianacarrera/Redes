@@ -8,6 +8,14 @@
 #include "lib.h"
 
 
+void cerrar_con_error(char * mensaje, int con_errno){
+    if (con_errno)
+        perror(mensaje);
+    else
+        fprintf(stderr, "%s\n", mensaje);
+    exit(EXIT_FAILURE);
+}
+
 /*
  * Función que comprueba si una determinada cadena de caracteres tiene un
  * formato de puerto válido para el programa, esto es, que es un entero
@@ -16,10 +24,10 @@
  * Se trata de una adaptación de la función comprobar_port qie utilicé en
  * la práctica 1.
  *
- * Si en efecto, se trata de un puerto correcto, la función devuelve 1 y
- * guarda en port_formateado el entero correspondiente.
- * En caso contrario, se imprime una descripción del problema y se devuelve 0.
- * La ejecución no se termina aquí, sino en las funciones principales.
+ * Si en efecto, se trata de un puerto correcto, la función guarda en
+ * port_formateado el entero correspondiente.
+ * En caso contrario, se imprime una descripción del problema y se corta la
+ * ejecución del programa.
  *
  * Parámetros:
  * const char * port -> (entrada) cadena con el puerto a convertir
@@ -27,11 +35,8 @@
  *      guardará el puerto en formato entero. uint16_t es un entero sin signo
  *      de 16 bits, el tipo definido para puertos (cabecera inttypes.h).
  *
- * La función devuelve:
- *      0 -> En caso de error
- *      1 -> Si la conversión se realizó correctamente
  */
-short comprobar_port(const char * port, uint16_t * port_formateado){
+void comprobar_port(const char * port, uint16_t * port_formateado){
     // Para comprobar si el puerto es válido, usaremos strtoul en lugar de
     // atoi, que no permitiría distinguir el puerto 0 de un error.
 
@@ -51,39 +56,26 @@ short comprobar_port(const char * port, uint16_t * port_formateado){
 
     // Si la cadena es no vacía y toda ella es numérica, final_conversion debe
     // apuntar a la dirección del carácter nulo
-    if (*port == '\0' || *final_conversion != '\0'){
-        fprintf(stderr, "El puerto no es válido\n\n");
-        return 0;
-    }
+    if (*port == '\0' || *final_conversion != '\0')
+        cerrar_con_error("El puerto no es válido", 0)
 
     // Comprobamos que no haya tenido lugar un overflow
     // ULONG_MAX es una macro definida en limits.h
     if (port_numerico == ULONG_MAX && errno == ERANGE){
         fprintf(stderr, "El puerto está fuera del rango "
                 "representable\n");
-        perror("Error del sistema: ");   // Imprimos el error que da errno
-        fprintf(stderr, "\n");
-        return 0;
+        cerrar_con_error("Error del sistema", 1); // Imprimos el error de errno
     }
 
     if (port_numerico > 65535){
         fprintf(stderr, "El puerto está fuera del rango "
                 "válido para este programa: [%d, 65535]\n\n",
                 IPPORT_USERRESERVED);
-        return 0;
+        exit(EXIT_FAILURE);
     }
 
     // El input del usuario es correcto
     *port_formateado = (uint16_t) port_numerico;
-    return 1;
-}
-
-void cerrar_con_error(char * mensaje, int con_errno){
-    if (con_errno)
-        perror(mensaje);
-    else
-        fprintf(stderr, "%s\n", mensaje);
-    exit(EXIT_FAILURE);
 }
 
 
@@ -118,9 +110,12 @@ void marcar_pasivo(int sockserv, int max_espera){
         cerrar_con_error("Error - no se pudo poner el socket a la escucha", 1);
 }
 
-int atender(int sockserv, struct sockaddr_in * ipportcli,
-        socklen_t * length_ptr){
+int atender(int sockserv, struct sockaddr_in * ipportcli){
+    socklen_t length_ptr;    // Servirá tanto para indicar el tamaño de la
+            // estructura addr a accept() como para que dicha función guarde el
+            // tamaño de la dirección del cliente
     int sockcon;
+
     *length_ptr = sizeof(struct sockaddr_in);
     if ((sockcon = accept(
                 sockserv, (struct sockaddr *) ipportcli, length_ptr
