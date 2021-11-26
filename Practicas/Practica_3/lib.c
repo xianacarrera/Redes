@@ -172,14 +172,17 @@ ssize_t enviar(int socket, void * mensaje, struct sockaddr_in * dir_remota){
 }*/
 
 // SE PUEDE USAR sizeof() en lugar de strlen??????????
-
+// Pasamos el segundo argumento como void para admitir tanto char * como floats
+// ya que de igual modo, en el caso de los floats tendríamos que pasar el argumento tamaño
+// (al pasar una string podemos calcular su tamaño con strlen, pero no podemos usar
+// sizeof con un puntero a floats porque no podemos encontrar el final, necesitamos
+// pasar su tamaño)
 ssize_t enviar(int socket, void * mensaje, struct sockaddr_in * dir_remota,
-        int tam){
+        size_t tam){
     ssize_t nbytes;  // Guardará el número de bytes transmitidos
 
     if ((nbytes = sendto(
-                socket, mensaje, (size_t) sizeof(mensaje), 0,
-                (struct sockaddr *) dir_remota,
+                socket, mensaje, tam, 0, (struct sockaddr *) dir_remota,
                 (socklen_t) sizeof(struct sockaddr_in))
             ) < 0)
         // strlen(mensaje) es igual a strlen(mensaje) * sizeof(char),

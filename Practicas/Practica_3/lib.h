@@ -11,7 +11,8 @@ ssize_t recibir(int socket, char * buffer, struct sockaddr_in * dir_remota,
         size_t numbytes);
 void cerrar_socket(int sockcon);
 
-ssize_t enviar(int socket, float * mensaje, struct sockaddr_in * dir_remota);
+ssize_t enviar(int socket, void * mensaje, struct sockaddr_in * dir_remota,
+        size_t tam);
 ssize_t recibir_floats(int socket, float * buffer,
             struct sockaddr_in * dir_remota);
 

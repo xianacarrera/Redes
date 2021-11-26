@@ -7,8 +7,10 @@ HEADER_FILES_DIR = .
 INCLUDES = -I $(HEADER_FILES_DIR)
 
 # Ficheros fuente
-SRCS_1 = programa1_n.c lib.c
-SRCS_2 = programa2_n.c lib.c
+SRCS_1 = programa1.c lib.c
+SRCS_2 = programa2.c lib.c
+SRCS_3 = servidorUDP.c lib.c
+SRCS_4 = clienteUDP.c lib.c
 
 # Cabeceras
 LIB_HEADERS = $(HEADER_FILES_DIR)/lib.h 
@@ -17,10 +19,14 @@ LIB_HEADERS = $(HEADER_FILES_DIR)/lib.h
 # nombres de los ficheros fuente sin extensión
 OUTPUT_1 = p1
 OUTPUT_2 = p2
+OUTPUT_3 = serv
+OUTPUT_4 = cli
 
 # Archivos objeto respectivos (.o con un .c análogo como fichero fuente)
 OBJS_1 = $(SRCS_1:.c=.o)
 OBJS_2 = $(SRCS_2:.c=.o)
+OBJS_3 = $(SRCS_3:.c=.o)
+OBJS_4 = $(SRCS_4:.c=.o)
 
 
 # Regla 1
