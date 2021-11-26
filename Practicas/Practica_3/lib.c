@@ -77,48 +77,184 @@ void comprobar_port(const char * port, uint16_t * port_formateado){
     *port_formateado = (uint16_t) port_numerico;
 }
 
-
+/*
+ * Función que encapsula socket() y su gestión de errores.
+ * Es utilizada por el servidor y el cliente.
+ *
+ * Se crea un nuevo socket para direcciones IPv4 y orientado a conexión (TCP).
+ * El descriptor generado se devuelve como valor de retorno.
+ * En caso de error, se imprime un mensaje descriptivo junto al significado
+ * del valor al que se ha dejado errno y se finaliza la ejecución.
+ */
 int crear_socket(){
-    int sock;
-    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+    int sock;         // Valor de retorno de socket()
+
+    /*
+     * Pasamos como argumentos:
+     * - AF_INET, pues el dominio de comunicación serán direcciones IPv4
+     * - SOCK_STREAM, para establecer un servicio orientado a conexión (TCP).
+     * - 0, para utilizar el protocolo por defecto para la combinación
+     *      AF_INET y SOCK_STREAM (IPPROTO_TCP).
+     */
+    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+        // Si socket() devuelve -1, ha ocurrido un error
         cerrar_con_error("Error - No se pudo crear el socket", 1);
-    return sock;
+    return sock;      // Devolvemos el identificador del socket
 }
 
+
+/*
+ * Función que encapsula bind() y su gestión de errores.
+ * Es utilizada por el servidor.
+ *
+ * Se asigna una dirección (un par IP - puerto) a un socket previamente creado.
+ * Como IP se establecerá INADDR_ANY, de forma que el servidor pueda escuchar
+ * a través de cualquier interfaz.
+ * En caso de error, se para la ejecución y se imprime un mensaje de error.
+ *
+ * Parámetros:
+ *      - sockserv -> Entrada. Identificador del socket al que se asignará la
+ *                    dirección.
+ *      - puerto -> Entrada. Número de puerto al que se conectará el socket.
+ */
 void asignar_direccion_socket(int socket, uint16_t puerto){
     struct sockaddr_in dir_propia;
 
-    memset(&dir_propia, 0, sizeof(dir_propia));
-    dir_propia.sin_family = AF_INET;
-    // Para aceptar conexiones a través de cualquier interfaz, indicamos INADDR_ANY
-    // htonl porque la macro INADDR_ANY está en orden de host
+    memset(&dir_propia, 0, sizeof(dir_propia));    // "Limpiamos" el espacio
+    dir_propia.sin_family = AF_INET;     // Utilzaremos una dirección IPv4
+    // Para aceptar conexiones a través de cualquier interfaz, indicamos
+    // INADDR_ANY. Para convertirla de orden de host a red, usamos htonl()
     dir_propia.sin_addr.s_addr = htonl(INADDR_ANY);
     dir_propia.sin_port = htons(puerto);
+    // Guardamos el puerto pasado como argumento, pasado de orden de host a
+    // orden de red con htons()
 
-    // MEMSET???
+    /*
+     * Asignamos la dirección al socket, con argumentos:
+     * - el entero identificador del socket.
+     * - un puntero a la estructura con la dirección a asignar, utilizando
+     *      el tipo genérico struct sockaddr *.
+     * - el tamaño de la anterior estructura.
+     */
     if (bind(socket, (struct sockaddr *) &dir_propia,
             (socklen_t) sizeof(dir_propia)) < 0)
         cerrar_con_error("Error - no se pudieron asignar la dirección y el "
                 "puerto al socket", 1);
 }
 
-int enviar(int socket, char * mensaje, struct sockaddr_in * dir_remota){
-    ssize_t nbytes;
-    socklen_t tamanho = sizeof(struct sockaddr_in);
+/*
+ * Función que encapsula send() y su gestión de errores.
+ * Es utilizada por el servidor y por el cliente.
+ *
+ * Se envía un mensaje pasado como argumento al otro extremo de la conexión
+ * establecida sobre un socket. Se intenta enviar la totalidad del mensaje.
+ * La función devuelve el número de bytes transmitidos, pero no se puede
+ * asegurar que se hayan recibido correctamente.
+ * En caso de error, se para la ejecución y se imprime un mensaje de error.
+ *
+ * Parámetros:
+ * - sockcon -> Entrada. Identificador del socket de la conexión.
+ * - mensaje -> Entrda. Datos a enviar.
+ *//*
+ssize_t enviar(int socket, void * mensaje, struct sockaddr_in * dir_remota){
+    ssize_t nbytes;  // Guardará el número de bytes transmitidos
 
-    if ((nbytes = sendto(socket, (void *) mensaje, (size_t) sizeof(mensaje),
-            0, )))
+    if ((nbytes = sendto(
+                socket, mensaje, (size_t) (strlen(mensaje) + 1), 0,
+                (struct sockaddr *) dir_remota,
+                (socklen_t) sizeof(struct sockaddr_in))
+            ) < 0)
+        // strlen(mensaje) es igual a strlen(mensaje) * sizeof(char),
+        // dado que sizeof(char) siempre es 1
+        cerrar_con_error("Error en el envío de datos", 1);
+
+    return nbytes;
+}*/
+
+// SE PUEDE USAR sizeof() en lugar de strlen??????????
+
+ssize_t enviar(int socket, void * mensaje, struct sockaddr_in * dir_remota,
+        int tam){
+    ssize_t nbytes;  // Guardará el número de bytes transmitidos
+
+    if ((nbytes = sendto(
+                socket, mensaje, (size_t) sizeof(mensaje), 0,
+                (struct sockaddr *) dir_remota,
+                (socklen_t) sizeof(struct sockaddr_in))
+            ) < 0)
+        // strlen(mensaje) es igual a strlen(mensaje) * sizeof(char),
+        // dado que sizeof(char) siempre es 1
+        cerrar_con_error("Error en el envío de datos", 1);
+
+    return nbytes;
 }
 
-int recibir(int socket, char * mensaje, struct sockaddr_in * dir_remota){
-    ssize_t nbytes;
+
+/*
+ * Función que encapsula recv() y su gestión de errores.
+ * Es utilizada por el servidor y por el cliente.
+ *
+ * Se reciben datos pasados a través de la conexión establecida sobre el socket
+ * de identificador sockcon. Se intenta recibir todos los datos que contiene el
+ * mensaje, teniendo en cuenta que se ha impuesto un límite de longitud igual a
+ * N (macro definida en lib.h). La función devuelve el número de bytes
+ * recibidos.
+ * En caso de error, se para la ejecución y se imprime un mensaje de error.
+ *
+ * Parámetros:
+ * - sockcon -> Entrada. Identificador del socket de la conexión.
+ * - buffer -> Salida. Puntero al buffer donde se guardará el mensaje recibido.
+ */
+ssize_t recibir(int socket, char * buffer, struct sockaddr_in * dir_remota,
+        size_t numbytes){
+    ssize_t nbytes;       // Número de bytes recibidos
     socklen_t tamanho = sizeof(struct sockaddr_in);
 
-    if ((nbytes = recvfrom(socket, (void *) mensaje, (size_t) sizeof(mensaje),
-            0, (struct sockaddr *) dir_remota, &tamanho)) < 0){
-        cerrar_con_error("Error en la recepción de datos", 1);
-    } else if (nbytes == 0)
-        fprintf(stderr, "El socket de conexión se ha cerrado\n");
+    if (numbytes == -1) numbytes = N;     // Valor por defecto
+
+    /*
+     * Llamamos a recv() con argumentos:
+     * - el entero identificador del socket de la conexión
+     * - un puntero al buffer donde guardar los datos
+     * - el máximo de bytes a recibir. Como no sabemos cóom será el mensaje,
+     *      indicamos el tamaño del array, N
+     * - las opciones predeterminadas (0)
+     */
+    if ((nbytes = recvfrom(socket, (void *) buffer, (size_t) numbytes, 0,
+        (struct sockaddr *) dir_remota, &tamanho)) < 0){
+        perror("Error en la recepción de datos");
+        exit(EXIT_FAILURE);
+    } else if (nbytes == 0){
+        // No se ha recibido ningún byte o el socket se ha cerrado
+        printf("\nNo se han recibido datos\n");
+    }
+
+    return nbytes;
+}
+
+
+// El receptor pone como máximo recibir 1000 floats
+ssize_t recibir_floats(int socket, float * buffer,
+            struct sockaddr_in * dir_remota){
+    ssize_t nbytes;       // Número de bytes recibidos
+    socklen_t tamanho = sizeof(struct sockaddr_in);
+
+    /*
+     * Llamamos a recv() con argumentos:
+     * - el entero identificador del socket de la conexión
+     * - un puntero al buffer donde guardar los datos
+     * - el máximo de bytes a recibir. Como no sabemos cóom será el mensaje,
+     *      indicamos el tamaño del array, N
+     * - las opciones predeterminadas (0)
+     */
+    if ((nbytes = recvfrom(socket, (void *) buffer, (size_t) N * sizeof(float),
+        0, (struct sockaddr *) dir_remota, &tamanho)) < 0){
+        perror("Error en la recepción de datos");
+        exit(EXIT_FAILURE);
+    } else if (nbytes == 0){
+        // No se ha recibido ningún byte o el socket se ha cerrado
+        printf("\nNo se han recibido datos\n");
+    }
 
     return nbytes;
 }
