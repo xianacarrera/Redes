@@ -50,13 +50,12 @@ $(OUTPUT_3): $(OBJS_3)
 	$(CC) -o $(OUTPUT_3) $(OBJS_3)
 	
 # Regla 5
-# Creamos el ejecutable del programa servidor de mayúsculas
+# Creamos el ejecutable del programa cliente de mayúsculas
 $(OUTPUT_4): $(OBJS_4) 
 	$(CC) -o $(OUTPUT_4) $(OBJS_4)
 
 # Regla 6
-# Creamos el archivo .o para el servidor a partir de su correspondiente .c
-# Si servidor.c cambia, solo servidor.o se recompilará. cliente.o no se ve afectado
+# Creamos cada archivo .o para el servidor a partir de su correspondiente .c
 $(*.o): %.c $(LIB_HEADERS) 
 	$(CC) -c -o $@ $< $(INCLUDES)
 

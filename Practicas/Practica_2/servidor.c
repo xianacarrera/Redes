@@ -7,25 +7,43 @@
 
 
 /*
+ * Xiana Carrera Alonso
+ * Redes - Práctica 2
+ * Curso 2021/2022
+ *
+ * Este programa actúa a modo de servidor. Tras conectarse con un cliente,
+ * imprime por pantalla su dirección (IP y puerto) y le envía un mensaje.
+ * Permite múltiples conexiones secuenciales de clientes.
+ *
+ * Notas:
+ * El servidor se cierra automáticamente tras 30 segundos de inactividad
+ * (donde se entiende inactividad por recibir algún tipo de input).
+ *
+ * En su estado actual, el programa implementa el comportamiento
+ * correspondiente al apartado 1a) de la práctica. Las líneas comentadas que
+ * comienzan por 1c) o 1d) corresponden al código de dichos apartados:
+ * 42 y 158-168.
+ *
  * La gestión de errores de socket(), bind(), listen(), accept(), send()
  * y close() se realiza en las funciones crear_socket(),
  * asignar_direccion_puerto(), marcar_pasivo(), atender(), enviar() y
  * cerrar_socket(), respectivamente.
  */
 
-#define MAX_CLIENTES 10  // Número total de clientes que atenderá el servidor
 #define MAX_COLA 3       // Número máximo de clientes esperando ser atendidos
+#define T_LIMITE 30      // Número de segundos que el socket puede permanecer
+                         // inactivo.
 
 
 int main(int argc, char * argv[]){
     int sockserv;                    // Socket del servidor
     int sockcon;                     // Socket de la conexión con el cliente
     char mensaje1[] = "Hey! Listen!";    // Primer mensaje que se enviará
-    char mensaje2[] = "¡Hola desde el otro lado!";    // Segundo mensaje
+    // 1c), 1d) char mensaje2[] = "¡Hola desde el otro lado!";  // Otro mensaje
     uint16_t puerto;          // Puerto introducido pasado a formato entero
     struct sockaddr_in ipportcli;    // Dirección del cliente (IP y puerto)
     ssize_t nbytes;                  // Número de bytes enviados al cliente
-    int nclientes = 0;               // Número de clientes que se han atendido
+    int i;                           // Contador para comprobaciones en envíos
     char ipcli[INET_ADDRSTRLEN];     // Cadena para almacenar la IP del
                                      // cliente en formato de texto
 
@@ -53,6 +71,9 @@ int main(int argc, char * argv[]){
     // sockserv guardará el entero identificador del socket
     sockserv = crear_socket();
 
+    // Ponemos un tiempo límite de inactividad
+    // Si pasan más de 30 segundos sin enviar datos, el socket se cierra
+    poner_limite_inactividad(sockserv, (time_t) T_LIMITE);
 
     /************************ ASIGNACIÓN DE DIRECCIÓN **********************/
 
@@ -63,7 +84,6 @@ int main(int argc, char * argv[]){
      */
     asignar_direccion_puerto(sockserv, puerto);
 
-
     /******************************* ESCUCHA *******************************/
 
     /*
@@ -72,14 +92,11 @@ int main(int argc, char * argv[]){
      * Permitimos hasta MAX_COLA clientes esperando ser atendidos. De esta
      * forma, se podrá atender múltiples conexiones secuenciales seguidas.
      */
-    marcar_pasivo(sockserv, MAX_COLA);
-
+    marcar_pasivo(sockserv, (unsigned int) MAX_COLA);
 
     /*********************** ATENCIÓN A LAS CONEXIONES *********************/
 
-    // Para poder controlar el cierre del socket del servidor, atendemos
-    // un número de clientes fijo.
-    while(nclientes++ < MAX_CLIENTES){
+    while(1){
          // Aceptamos la conexión de un cliente usando accept()
          // Guardamos su dirección (puerto + IP) en ipportcli
         sockcon = atender(sockserv, &ipportcli);
@@ -110,9 +127,17 @@ int main(int argc, char * argv[]){
 
         /*************************** ENVÍO DE DATOS *************************/
 
-        // Enviamos el primer mensaje
-        // Guardamos en nbytes el número de bytes transmitidos
-        nbytes = enviar(sockcon, mensaje1);
+        /*
+         * Enviamos el primer mensaje
+         * Guardamos en nbytes el número de bytes transmitidos
+         * Si send() no logra enviar todos los bytes, repetimos el envío con
+         * la parte del mensaje que aún no se haya transmitido.
+         */
+        i = 0;
+        while ((nbytes = enviar(sockcon, &mensaje1[i]))
+                != strlen(&mensaje1[i]) + 1){
+            i += nbytes;
+        }
 
         // Aunque el formato estándar para ssize_t es %zd, los sistemas
         // antiguos no lo soportan. Por seguridad, realizamos un cast a long
@@ -127,15 +152,21 @@ int main(int argc, char * argv[]){
          * 1 byte extra por el carácter nulo, que siempre enviamos.
          */
 
+        // 1c), 1d)
         // Enviamos el segundo mensaje al mismo cliente
-        nbytes = enviar(sockcon, mensaje2);
+        /*
+        i = 0;
+        while ((nbytes = enviar(sockcon, &mensaje2[i]))
+                != strlen(&mensaje2[i]) + 1){
+            i += nbytes;
+        }
 
         printf("***** Envío 2 *****\n");
         printf("\tSe han enviado %ld bytes.\n", (long) nbytes);
         printf("\tLongitud del mensaje 2 original: %ld bytes\n",
                 strlen(mensaje2) + 1);
         printf("\tMensaje 2 original: %s\n\n", mensaje2);
-
+        */
 
         /************************** CIERRE DE LA CONEXIÓN *******************/
 
@@ -145,13 +176,18 @@ int main(int argc, char * argv[]){
 
     /*********************** CIERRE DEL SERVIDOR ****************************/
 
-    printf("Se ha alcanzado el número de clientes máximo: %d\n", MAX_CLIENTES);
+    /*
+     * En realidad, esta parte nunca se llega a ejecutar dado que el bucle
+     * while es infinito. El cierre de los recursos se transfiere al sistema
+     * operativo. No obstante, se dejan estas líneas por si se cambiara
+     * el bucle para que fuera finito o pudiera finalizarse.
+     */
 
     // Tras atender a los clientes, cerramos el socket del servidor
     cerrar_socket(sockserv);
 
     // En este programa no se ha reservado memoria
 
-    printf("Cerrando servidor...\n");
+    printf("Cerrando servidor...\n\n");
     exit(EXIT_SUCCESS);
 }

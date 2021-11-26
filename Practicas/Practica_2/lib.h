@@ -97,6 +97,14 @@ ssize_t recibir(int sockcon, char * buffer);
 ssize_t recibir_nbytes(int sockcon, char * buffer, size_t numbytes);
 
 /*
+ * Función que establece un límite de inactividad a un socket. Si no se recibe
+ * algún tipo de input pasado ese intervalo, el socket se cierra.
+ * @param socket Identificador del socket a configurar.
+ * @param s Tiempo en segundos que se utilizará como máximo de inactividad
+ */
+void poner_limite_inactividad(int socket, time_t s);
+
+/*
  * Función que cierra un socket
  * @param sock Identificador del socket a cerrar
  */

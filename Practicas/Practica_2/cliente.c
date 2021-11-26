@@ -2,17 +2,32 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <inttypes.h>
+#include <unistd.h>
 #include "lib.h"
 
-// Quitar librerías innecesarias
-
-#define BYTES_A_RECIBIR 5
-
 /*
+ * Xiana Carrera Alonso
+ * Redes - Práctica 2
+ * Curso 2021/2022
+ *
+ * Este programa actúa de cliente a un servidor. Tras conectarse a él,
+ * recibe un mensaje, lo imprime y se cierra.
+ *
+ * Notas:
+ * En su estado actual, el programa implementa el comportamiento
+ * correspondiente al apartado 1a) de la práctica. Las líneas comentadas que
+ * comienzan por 1c) o 1d) corresponden al código de dichos apartados:
+ * 29, 107 y 167-198 (tapar las líneas 124 a 148 y la línea 108).
+ *
  * La gestión de errores de las funciones socket(), connect(), recv() y
  * close() se realiza en crear_socket(), solicitar_conexion(), recibir()
  * o recibir_nbytes(), y cerrar_socket(), respectivamente.
  */
+
+
+// #define BYTES_A_RECIBIR 5  // Bytes que recoge recv() en cada llamada
+
 
 int main(int argc, char * argv[]){
     int sockcli;       // Identificador del socket que se usará en la conexión
@@ -30,22 +45,7 @@ int main(int argc, char * argv[]){
          * macro para añadir '\0' en caso de que el servidor no lo envíe.
          */
 
-
     /************************ COMPROBACIÓN DEL INPUT ***********************/
-
-    /*
-     * Si el número de bytes que queremos recibir en el apartado 1.d) es mayor
-     * que el tamaño de los mensajes, podría haber un comportamiento
-     * inesperado. Por precaución, paramos la ejecución.
-     * No es necesario comparar con N * sizeof(char) en lugar de N, ya que
-     * sizeof(char) es siempre 1.
-     */
-    if (BYTES_A_RECIBIR > N)
-        // Imprimimos el error sin llamar a perror() (0 como segundo argumento)
-        // y cerramos el programa
-        cerrar_con_error("Se está intentando especificar un tamaño de "
-                "recepción mayor que el tamaño máximo de un mensaje. "
-                "Abortando...", 0);
 
     if (argc != 3)
         cerrar_con_error("Introducir 2 argumentos: IP y puerto del "
@@ -94,9 +94,16 @@ int main(int argc, char * argv[]){
     // y puerto
     solicitar_conexion(sockcli, ipportserv);
 
+    // Si no hubo errores, se habrá creado la conexión con el servidor
+    printf("Se ha establecido la conexión con el servidor de:\n");
+    printf("\tIP: %s\n", argv[1]);
+    printf("\tPuerto: %" PRIu16 "\n\n", puerto);
+    // Usamos el formato PRIu16 para imprimir el uint16_t
+
 
     /************************ RECEPCIÓN DEL MENSAJE ************************/
-    // Apartado 1.c) Esperamos 3 s para que al servidor le de tiempo a enviar
+
+    // 1c) Esperamos 3 s para que al servidor le de tiempo a enviar
     // ambos mensajes
     // sleep(3);
 
@@ -114,36 +121,34 @@ int main(int argc, char * argv[]){
      * comportamiento por defecto).
      * El número de bytes recibidos se guarda en res_recv.
      */
-//    res_recv = recibir(sockcli, &buffer[0]);
+    res_recv = recibir(sockcli, &buffer[0]);
 
-//    printf("¡Ha llegado un mensaje del servidor!\n");
+    printf("¡Ha llegado un mensaje del servidor!\n");
     // Aunque el formato estándar para ssize_t es %zd, los sistemas
     // antiguos no lo soportan. Por seguridad, realizamos un cast a long
-//    printf("\tNúmero de bytes recibidos: %ld\n", (long) res_recv);
+    printf("\tNúmero de bytes recibidos: %ld\n", (long) res_recv);
+
+
+    // El mensaje que envíe el servidor puede contener caracteres nulos
+    // intermedios. Para asegurar que lo mostramos en su totalidad,
+    // llevamos la cuenta del número de bytes leídos, teniendo en cuenta
+    // que sizeof(char) = 1.
+    printf("\tMensaje: ");
+    leido = 0;
+    while (leido < res_recv){
+        frase = &buffer[leido]; // Nos colocamos en el primer carácter sin leer
+        printf("%s\n\t", frase);    // Imprimimos hasta encontrar '\0'
+
+        // Aumentamos leido para que apunte al carácter siguiente a '\0'.
+        // Nótese que strlen() no cuenta '\0', de modo que tenemos que
+        // debemos sumar 1 a la longitud de la cadena.
+        // Aunque el mensaje recibido no termine en '\0', lo hemos añadido
+        // artificialmente, de forma que estas operaciones tienen sentido.
+        leido += strlen(frase) + 1;
+    }
 
     /*
-     * El mensaje que envíe el servidor puede contener caracteres nulos
-     * intermedios. Para asegurar que lo mostramos en su totalidad,
-     * llevamos la cuenta del número de bytes leídos, teniendo en cuenta
-     * que sizeof(char) = 1.
-     */
-//    printf("\tMensaje: ");
-//    leido = 0;
-//    while (leido < res_recv){
-//        frase = &buffer[leido]; // Nos colocamos en el primer carácter sin leer
-//        printf("%s", frase);    // Imprimimos hasta encontrar '\0'
-        /*
-         * Aumentamos leido para que apunte al carácter siguiente a '\0'
-         * Nótese sizeof('\0') = 4, ya que '\0' es un carácter literal, que en
-         * C se interpreta como un int.
-         * Aunque la cadena recibida no termine en '\0', lo hemos añadido
-         * artificialmente, de forma que estas operaciones tienen sentido.
-         */
-//        leido += strlen(frase) + sizeof('\0');
-//    }
-//    printf("\n");
-
-    /*
+     * 1d) (Tapar las líneas 124 a 148 y la línea 108)
      * Llamamos a recibir_nbytes(), una modificación de recibir() que
      * especifica en recv() un cierto número de bytes a recoger del envío
      * (el tercer argumento de recibir_nbytes()).
@@ -158,6 +163,7 @@ int main(int argc, char * argv[]){
      * de anteriores envíos guardados en el buffer. Por precaución, vaciamos
      * lo usado en la cadena antes de cada recepción.
      */
+    /*
     while ((res_recv = recibir_nbytes(sockcli, &buffer[0],
             (size_t) BYTES_A_RECIBIR)) > 0){
         leido = 0;      // Reiniciamos leido
@@ -167,34 +173,30 @@ int main(int argc, char * argv[]){
         // antiguos no lo soportan. Por seguridad, realizamos un cast a long
         printf("\tNúmero de bytes recibidos: %ld\n", (long) res_recv);
 
-        /*
-         * El mensaje que envíe el servidor puede contener caracteres nulos
-         * intermedios. Para asegurar que lo mostramos en su totalidad,
-         * llevamos la cuenta del número de bytes leídos, teniendo en cuenta
-         * que sizeof(char) = 1.
-         */
+        // El mensaje que envíe el servidor puede contener caracteres nulos
+        // intermedios. Para asegurar que lo mostramos en su totalidad,
+        // llevamos la cuenta del número de bytes leídos, teniendo en cuenta
+        // que sizeof(char) = 1.
         printf("\tMensaje: ");
         while (leido < res_recv){
             frase = &buffer[leido];   // Primer carácter sin leer
-            printf("%s\n", frase);    // Imprimimos hasta encontrar '\0'
-            /*
-             * Aumentamos leido para que apunte al carácter siguiente a '\0'.
-             * Nótese que strlen() no cuenta '\0', de modo que tenemos que
-             * debemos sumar 1 a la longitud de la cadena.
-             * Aunque el mensaje recibido no termine en '\0', lo hemos añadido
-             * artificialmente, de forma que estas operaciones tienen sentido.
-             */
+            printf("%s\n\t", frase);    // Imprimimos hasta encontrar '\0'
+
+            // Aumentamos leido para que apunte al carácter siguiente a '\0'.
+            // Nótese que strlen() no cuenta '\0', de modo que tenemos que
+            // debemos sumar 1 a la longitud de la cadena.
+            // Aunque el mensaje recibido no termine en '\0', lo hemos añadido
+            // artificialmente, de forma que estas operaciones tienen sentido.
             leido += strlen(frase) + 1;
         }
 
-        /*
-         * Vaciamos la memoria que podríamos haber usado. En este caso, dado
-         * que trabajamos con arrays de caracteres, número de bytes y número
-         * de posiciones son comparables, pues sizeof(char) es 1. Así,
-         * llenaremos BYTES_A_RECIBIR posiciones con '\0'.
-         */
+        // Vaciamos la memoria que podríamos haber usado. En este caso, dado
+        // que trabajamos con arrays de caracteres, número de bytes y número
+        // de posiciones son comparables, pues sizeof(char) es 1. Así,
+        // llenaremos BYTES_A_RECIBIR posiciones con '\0'.
         memset(&buffer[0], '\0', BYTES_A_RECIBIR);
     }
+    */
 
     /************************** CIERRE DE LA CONEXIÓN *******************/
     // Cerramos el socket a través del cual se estableció la conexión.
@@ -202,7 +204,7 @@ int main(int argc, char * argv[]){
 
     // En este programa no se ha reservado memoria
 
-    printf("Cerrando cliente...\n\n");
+    printf("\nCerrando cliente...\n\n");
 
     exit(EXIT_SUCCESS);
 }

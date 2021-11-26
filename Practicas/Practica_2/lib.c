@@ -398,10 +398,42 @@ ssize_t recibir_nbytes(int sockcon, char * buffer, size_t numbytes){
         exit(EXIT_FAILURE);
     } else if (res_recv == 0){
         // No se ha recibido ningún byte o el socket se ha cerrado
-        printf("No se han recibido datos\n");
+        printf("\nNo se han recibido datos\n");
     }
 
     return res_recv;
+}
+
+
+/*
+ * Función que pone un límite de inactividad a un socket.
+ * Es utiilizada por el servidor.
+ *
+ * Se establece un tiempo máximo que el socket puede permanecer sin recibir
+ * algún tipo de input.
+ *
+ * Parámetros:
+ *      - socket -> Entrada. Identificador del socket a configurar.
+ *      - s -> Entrada. Tiempo límite en segundos.
+ */
+void poner_limite_inactividad(int socket, time_t s){
+    struct timeval tlimite;
+    tlimite.tv_sec = s;         // Esperamos s segundos
+    tlimite.tv_usec = 0;        // Ponemos los microsegundos a 0
+
+    /*
+     * Llamamos a la función setsockopt() para dar opciones al socket
+     * Pasamos como argumento:
+     * - el entero identificador del socket
+     * - el nivel en el que reside la opción a cambiar (SO_RCVTIMEO)
+     * - una estructura timeval donde indicamos el valor en segundos y
+     *   microsegundos a usar
+     * - el tamaño de la anterior estructura
+     */
+    if (setsockopt (socket, SOL_SOCKET, SO_RCVTIMEO, (const void *) &tlimite,
+            (socklen_t) sizeof(struct timeval)) < 0)
+        cerrar_con_error("No se pudo establecer un tiempo límite de "
+                "inactividad", 1);
 }
 
 

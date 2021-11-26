@@ -1,20 +1,30 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <errno.h>
-#include <limits.h>
-#include <string.h>
 #include <arpa/inet.h>
-#include <unistd.h>
+#include <string.h>
+#include <inttypes.h>
 #include <ctype.h>
+#include <unistd.h>
 #include "lib.h"
 
-// IP de Inés: 172.25.45.169
-
-
-// Comprobar fichero vacío
-// Líneas de 1000 o 999 caracteres
+/*
+ * Xiana Carrera Alonso
+ * Redes - Práctica 2
+ * Curso 2021/2022
+ *
+ * Este programa implementa un cliente de mayúsculas. Se encarga de leer
+ * líneas de un fichero de texto pasado como argumento y enviárselas a un
+ * servidor que las pasa a mayúsculas y se las reenvía. Tras recibir los datos,
+ * escribe las líneas resultantes en un archivo de salida.
+ *
+ * Notas:
+ * Cada cliente espera 2 segundos antes de empezar a enviar datos al servidor
+ * para facilitar las comprobaciones del ejercicio 3 con conexiones
+ * secuenciales de clientes.
+ *
+ * La comprobación de errores se realiza a través de las funciones de la
+ * librería lib.h.
+ */
 
 
 int main(int argc, char * argv[]){
@@ -27,7 +37,7 @@ int main(int argc, char * argv[]){
     char linea[N];              // Líneas leídas del fichero de entrada
     char buffer[N];             // Buffer para la recepción de mensajes
     ssize_t nbytes;             // Número de bytes enviados o recibidos
-    int i;
+    int i;                      // Contador para el envío de datos
 
     /************************ TRATAMIENTO DEL INPUT ***********************/
 
@@ -106,13 +116,17 @@ int main(int argc, char * argv[]){
     // sockcli guardará el entero identificador del socket del cliente
     sockcli = crear_socket();
 
-
     /*********************** SOLICITUD DE CONEXIÓN *************************/
 
     // Solicitamos la conexión con el servidor, identificado por su dirección
     // y puerto
     solicitar_conexion(sockcli, ipportserv);
 
+    // Si no hubo errores, se habrá creado la conexión con el servidor
+    printf("Se ha establecido la conexión con el servidor de:\n");
+    printf("\tIP: %s\n", argv[2]);
+    printf("\tPuerto: %" PRIu16 "\n\n", puerto);
+    // Usamos el formato PRIu16 para imprimir el uint16_t
 
     /********************* ENVÍO Y RECEPCIÓN DE DATOS  *********************/
 
@@ -125,11 +139,21 @@ int main(int argc, char * argv[]){
     while (fgets(linea, N, fichero_ent) != NULL){
         // Nótese que fgets añade '\0' como carácter siguiente a lo almacenado
 
-        sleep(1);
+        // (apartado 3) Para comprobar más fácilmente conexiones secuenciales
+        // de clientes, esperamos 2 segundos antes de enviar los datos.
+        sleep(2);
 
-        // No enviamos N bytes, sino solo el tamaño correspondiente a lo
-        // leído, junto al carácter nulo final. Se usa que sizeof(char) es 1.
-        nbytes = enviar_nbytes(sockcli, linea, strlen(linea) + 1);
+        /*
+         * No enviamos N bytes, sino solo el tamaño correspondiente a lo
+         * leído, junto al carácter nulo final. Se usa que sizeof(char) es 1.
+         * Si send() no logra enviar todos los bytes, repetimos el envío con
+         * la parte del mensaje que aún no se haya transmitido.
+         */
+        i = 0;
+        while ((nbytes = enviar_nbytes(sockcli, &linea[i],
+                strlen(&linea[i]) + 1)) != strlen(&linea[i]) + 1){
+            i += nbytes;
+        }
 
         printf("***** Envío de datos *****\n");
         // Aunque el formato estándar para ssize_t es %zd, los sistemas
@@ -145,6 +169,13 @@ int main(int argc, char * argv[]){
         printf("***** Recepción de datos *****\n");
         printf("\tNúmero de bytes recibidos: %ld\n", (long) nbytes);
         printf("\tMensaje recibido: %s\n\n", buffer);
+
+        // Escribimos la línea que se ha recibido sobre el fichero de salida,
+        // sin el carácter nulo final
+        if (fputs((const char *) buffer, fichero_sal) == EOF){
+            cerrar_con_error("Ha tenido lugar un error al escribir en "
+                    "en el archivo de salida", 0);
+        }
     }
 
     // Comprobamos si fgets ha parado por un error o por llegar al final
@@ -174,6 +205,6 @@ int main(int argc, char * argv[]){
     // Separamos en los casos de que falle uno o los dos, porque sus errores
     // pueden ser distintos
 
-    printf("Cerrando cliente...\n");
+    printf("Cerrando cliente...\n\n");
     exit(EXIT_SUCCESS);
 }
